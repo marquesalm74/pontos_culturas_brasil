@@ -3,7 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import folium
 
-from controllers import pontos_controller as PontosController
+# Importa as funções diretamente do controller
+from controllers.pontos_controller import PontosController
 from streamlit_folium import st_folium
 from folium.plugins import Fullscreen
 from geobr import read_municipality
@@ -11,7 +12,7 @@ from matplotlib.colors import to_hex
 
 #################################################################
 
-def List():
+def list_pontos():
     if not st.session_state.get('usuario_autenticado', False):
         st.warning("Você precisa estar logado para acessar esta página.")
         st.stop()
@@ -20,7 +21,7 @@ def List():
 
     # Carregar dados
     if "df" not in st.session_state or st.button("🔄 Atualizar Lista"):
-        data = PontosController.SelecionarTodos()
+        data = PontosController.SelecionarTodos()  # chama função diretamente
         if not data:
             st.session_state['df'] = pd.DataFrame()
         else:
@@ -33,7 +34,7 @@ def List():
                         item.get('latitude'), item.get('longitude'),
                         item.get('cultura'), item.get('estadiofenolog'),
                         item.get('altitude'), item.get('temperatura'),
-                        item.get('tpsafra'), item.get('check_point')  # Corrigido aqui
+                        item.get('tpsafra'), item.get('check_point')
                     ])
                 else:
                     rows.append([
@@ -43,12 +44,12 @@ def List():
                         getattr(item, 'longitude', None), getattr(item, 'cultura', None),
                         getattr(item, 'estadiofenolog', None), getattr(item, 'altitude', None),
                         getattr(item, 'temperatura', None), getattr(item, 'tpsafra', None),
-                        getattr(item, 'check_point', None)  # Corrigido aqui
+                        getattr(item, 'check_point', None)
                     ])
             st.session_state['df'] = pd.DataFrame(rows, columns=[
                 'id', 'estado', 'codigo', 'municipio', 'data',
                 'latitude', 'longitude', 'cultura', 'estadiofenolog',
-                'altitude', 'temperatura', 'tp_safra', 'check_point'  # Corrigido aqui
+                'altitude', 'temperatura', 'tpsafra', 'check_point'
             ])
 
     df = st.session_state.get('df', pd.DataFrame())
@@ -56,8 +57,9 @@ def List():
     if df.empty:
         st.info("Nenhum ponto cadastrado.")
 
-    col1, col2 = st.columns([1, 1])
+    # --- restante do código mantém igual ---
 
+    col1, col2 = st.columns([1, 1])
     with col1:
         estados = sorted(df['estado'].dropna().unique().tolist()) if not df.empty else []
         estado = st.selectbox("Estado", [""] + estados)

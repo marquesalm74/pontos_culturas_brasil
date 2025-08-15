@@ -29,3 +29,4 @@ def deletar():
             st.session_state.pop("df", None)
         except Exception as e:
             st.error(f"Erro ao excluir: {e}")
+

@@ -158,7 +158,7 @@ def create():
             temp = st.number_input("Temperatura (°C)", value=0.0, step=0.1)
             informante = st.text_input("Nome do informante", st.session_state.get("usuario_nome", ""))
             emailinfo = st.text_input("E-mail para contato", st.session_state.get("email", ""))
-            obs = st.text_area("Observações (opcional)")
+            obs = st.text_area("Observações (opcional)", placeholder='Área Agrícola: ha, alqueire mineiro, alqueire paulista etc.')
             
             # NOVO: opção para já marcar como verificado
             check_point = st.checkbox("Se o ponto está verificado, favor marcar como verificado", value=False)
