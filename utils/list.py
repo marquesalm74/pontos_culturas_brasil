@@ -1,16 +1,14 @@
+# list.py
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import folium
-
-# Importa as funções diretamente do controller
-from controllers.pontos_controller import PontosController
+import matplotlib.pyplot as plt
+from matplotlib.colors import to_hex
 from streamlit_folium import st_folium
 from folium.plugins import Fullscreen
 from geobr import read_municipality
-from matplotlib.colors import to_hex
+import controllers.pontos_controller as PontosController
 
-#################################################################
 
 def list_pontos():
     if not st.session_state.get('usuario_autenticado', False):
@@ -19,9 +17,9 @@ def list_pontos():
 
     st.title("Pontos Cadastrados")
 
-    # Carregar dados
+    # --- CARREGAR DADOS ---
     if "df" not in st.session_state or st.button("🔄 Atualizar Lista"):
-        data = PontosController.SelecionarTodos()  # chama função diretamente
+        data = PontosController.SelecionarTodos()
         if not data:
             st.session_state['df'] = pd.DataFrame()
         else:
@@ -53,20 +51,21 @@ def list_pontos():
             ])
 
     df = st.session_state.get('df', pd.DataFrame())
-
     if df.empty:
         st.info("Nenhum ponto cadastrado.")
 
-    # --- restante do código mantém igual ---
+    # cria as colunas uma única vez; tudo da esquerda ficará DENTRO de col1
+    col1, col2 = st.columns([1, 1], gap="large")
 
-    col1, col2 = st.columns([1, 1])
+    # ---------------------------------------------------------------------
+    # COLUNA ESQUERDA (filtros, grid, ID e formulário de edição)
+    # ---------------------------------------------------------------------
     with col1:
+        # --- SELEÇÃO DE ESTADO E MUNICÍPIO ---
         estados = sorted(df['estado'].dropna().unique().tolist()) if not df.empty else []
         estado = st.selectbox("Estado", [""] + estados)
 
-        cidades = []
-        if estado:
-            cidades = sorted(df[df['estado'] == estado]['municipio'].dropna().unique().tolist())
+        cidades = sorted(df[df['estado'] == estado]['municipio'].dropna().unique().tolist()) if estado else []
         municipio = st.selectbox("Município", [""] + cidades)
 
         # Filtrar df conforme seleção
@@ -87,24 +86,26 @@ def list_pontos():
         else:
             st.info("Selecione um estado e um município para visualizar os registros.")
 
-        ###################################################################################
-        # Inicializa variáveis de sessão
-        if 'modo_edicao' not in st.session_state:
-            st.session_state['modo_edicao'] = False
-        if 'selected_id' not in st.session_state:
-            st.session_state['selected_id'] = None
-        if 'id_selecao' not in st.session_state:
-            st.session_state['id_selecao'] = 0
+        st.divider()
 
-        # Entrada do ID para edição
+        # --- INICIALIZA VARIÁVEIS DE SESSÃO ---
+        st.session_state.setdefault('modo_edicao', False)
+        st.session_state.setdefault('selected_id', None)
+        st.session_state.setdefault('id_selecao', 0)
+        st.session_state.setdefault('sucesso_msg', "")
+        st.session_state.setdefault('erro_atualizar', "")
+
+        # --- VARIÁVEL PADRÃO PARA MUNICÍPIO ---
+        novo_municipio = "0"
+
+        # --- ENTRADA DO ID PARA EDIÇÃO ---
         id_sel = st.number_input(
-            "ID do registro para editar (digite o id) - Após digitar o ID, click enter ou no espaço fora da caixa.",
+            "ID do registro para editar (digite o id) - Após digitar o ID, clique Enter ou fora da caixa.",
             min_value=0,
             step=1,
             key="id_selecao"
         )
 
-        # Botão para entrar no modo edição
         if id_sel > 0 and st.button("Editar este registro"):
             if not df_filtrado.empty and 'id' in df_filtrado.columns and not df_filtrado[df_filtrado['id'] == id_sel].empty:
                 st.session_state['modo_edicao'] = True
@@ -113,23 +114,25 @@ def list_pontos():
             else:
                 st.error("Registro não encontrado no filtro atual.")
 
-        # --- FORMULÁRIO DE EDIÇÃO ---
-        if st.session_state.get('modo_edicao') and st.session_state.get('selected_id') is not None:
-
+        # --- FORMULÁRIO DE EDIÇÃO (permanece na COLUNA 1) ---
+        if st.session_state['modo_edicao'] and st.session_state['selected_id'] is not None:
             id_edit = st.session_state['selected_id']
-
-            if not df_filtrado.empty and 'id' in df_filtrado.columns:
-                registro = df_filtrado[df_filtrado['id'] == id_edit]
-            else:
-                registro = pd.DataFrame()
+            registro = df_filtrado[df_filtrado['id'] == id_edit] if not df_filtrado.empty else pd.DataFrame()
 
             if registro.empty:
                 st.error("Registro não encontrado para edição.")
             else:
-                # Lista de municípios do estado com "0" no topo
-                lista_municipios = ["0"] + sorted(
-                    df.loc[df['estado'] == estado, 'municipio'].dropna().unique().tolist()
-                )
+                # Lista de municípios do geobr (todos da UF)
+                try:
+                    codigo_muni = int(registro.iloc[0].get('codigo', 0))
+                    codigo_uf = codigo_muni // 100000  # 2 dígitos da UF a partir do código IBGE
+                    municipios_gdf = read_municipality(code_muni=codigo_uf, year=2022)
+                    lista_municipios = ["0"] + sorted(municipios_gdf['name_muni'].unique().tolist())
+                except Exception as e:
+                    st.error(f"Erro ao carregar municípios do geobr: {e}")
+                    lista_municipios = ["0"] + sorted(
+                        df.loc[df['estado'] == estado, 'municipio'].dropna().unique().tolist()
+                    )
 
                 municipio_atual = registro.iloc[0].get('municipio', '')
                 codigo_atual = registro.iloc[0].get('codigo', '')
@@ -137,7 +140,7 @@ def list_pontos():
                 lon_atual = float(registro.iloc[0].get('longitude', 0))
                 check_atual = bool(registro.iloc[0].get('check_point', False)) if 'check_point' in registro.columns else False
 
-                st.markdown(f"## Editando registro ID {id_edit}")
+                st.markdown(f"### Editando registro ID {id_edit}")
 
                 novo_municipio = st.selectbox(
                     "Selecione o Município",
@@ -148,34 +151,17 @@ def list_pontos():
 
                 if novo_municipio != "0":
                     cod_match = df.loc[
-                        (df['estado'] == estado) & (df['municipio'] == novo_municipio),
-                        'codigo'
+                        (df['estado'] == estado) & (df['municipio'] == novo_municipio), 'codigo'
                     ]
                     codigo_municipio = cod_match.iloc[0] if not cod_match.empty else codigo_atual
                 else:
                     codigo_municipio = codigo_atual
 
                 st.text_input("Código do Município", value=str(codigo_municipio), disabled=True, key="edit_codigo")
+                nova_lat = st.number_input("Latitude", value=float(lat_atual), format="%.6f", key="edit_lat")
+                nova_lon = st.number_input("Longitude", value=float(lon_atual), format="%.6f", key="edit_lon")
+                novo_check = st.checkbox("Marcar como verificado", value=check_atual, key="edit_check")
 
-                nova_lat = st.number_input(
-                    "Latitude",
-                    value=float(lat_atual),
-                    format="%.6f",
-                    key="edit_lat"
-                )
-                nova_lon = st.number_input(
-                    "Longitude",
-                    value=float(lon_atual),
-                    format="%.6f",
-                    key="edit_lon"
-                )
-                novo_check = st.checkbox(
-                    "Marcar como verificado",
-                    value=check_atual,
-                    key="edit_check"
-                )
-
-                # ---- Callback seguro para salvar e resetar seleção ----
                 def salvar_alteracoes(id_edit, municipio_atual, codigo_municipio, nova_lat, nova_lon, novo_check, novo_municipio):
                     try:
                         novos_dados = {
@@ -183,18 +169,13 @@ def list_pontos():
                             "codigo": codigo_municipio,
                             "latitude": float(nova_lat),
                             "longitude": float(nova_lon),
-                            "check_point": bool(novo_check)
+                            "check_point": bool(novo_check),
                         }
                         PontosController.Atualizar(id_edit, novos_dados)
-
-                        # Mensagem de sucesso para exibir após o rerun automático
                         st.session_state['sucesso_msg'] = f"Registro {id_edit} atualizado com sucesso!"
-
-                        # Importante: atualizar a seleção via callback (sem violar a regra do Streamlit)
                         st.session_state['id_selecao'] = 0
                         st.session_state['modo_edicao'] = False
                         st.session_state['selected_id'] = None
-
                     except Exception as e:
                         st.session_state['erro_atualizar'] = f"Erro ao atualizar registro: {e}"
 
@@ -205,19 +186,19 @@ def list_pontos():
                     args=(id_edit, municipio_atual, codigo_municipio, nova_lat, nova_lon, novo_check, novo_municipio),
                 )
 
-                # Exibe mensagens após o rerun automático acionado pelo clique do botão
-                if st.session_state.get('sucesso_msg'):
+                # Mensagens (também dentro da coluna)
+                if st.session_state['sucesso_msg']:
                     st.success(st.session_state.pop('sucesso_msg'))
-                if st.session_state.get('erro_atualizar'):
+                if st.session_state['erro_atualizar']:
                     st.error(st.session_state.pop('erro_atualizar'))
 
-    #############################################################################
-    # GERAR O MAPA NO FOLIUM
-    ############################################################################
-    
-    # Coluna 2 - Mapa (sem alterações, você pode manter seu código original)
+    # ---------------------------------------------------------------------
+    # COLUNA DIREITA (mapa)
+    # ---------------------------------------------------------------------
     with col2:
         st.subheader("🗺️ Mapa dos Pontos")
+        if 'df_filtrado' not in locals():
+            df_filtrado = df.iloc[0:0].copy()
 
         if not df_filtrado.empty:
             m = folium.Map(
@@ -228,14 +209,12 @@ def list_pontos():
                 tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
                 attr='Esri'
             )
-
             Fullscreen().add_to(m)
 
             try:
                 if df_filtrado['codigo'].notnull().any():
                     codigo_ibge = int(df_filtrado['codigo'].iloc[0])
                     municipio_gdf = read_municipality(code_muni=codigo_ibge, year=2022)
-
                     if not municipio_gdf.empty:
                         folium.GeoJson(
                             municipio_gdf.__geo_interface__,
@@ -267,7 +246,6 @@ def list_pontos():
                 ).add_to(m)
 
             folium.LatLngPopup().add_to(m)
-
             st_folium(m, width=700, height=500)
         else:
             st.warning("Nenhum ponto encontrado para o município selecionado.")
