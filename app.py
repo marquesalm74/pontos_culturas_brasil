@@ -35,6 +35,8 @@ with st.sidebar:
     st.image("img/ponto_brasil.png" if st.query_params.get("dev") else "img/RCA.png", use_container_width=True)
     page = st.selectbox("PONTOS", ["Incluir", "Consultar", "Atualizar", "Deletar"])
     st.info("Você profissional do campo, pode contribuir com a coleta de informações de culturas no território brasileiro.")
+    
+    st.info("Para contato e/ou solicitação de outros municípios: alessandro.alm74@gmail.com")
 
 ###################################################################
 # Incluir ponto
@@ -47,7 +49,7 @@ if page == "Incluir":
 # Consultar pontos
 ###################################################################
 elif page == "Consultar":
-    PageList.List()
+    PageList.list_pontos()
     
 ###################################################################
 # Atualizar ponto
