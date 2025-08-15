@@ -21,4 +21,7 @@ Caso, haja a necessidade de mais informação de pontos de algum município espe
 Agradeço a contribuição e vamos a campo!
 
 Alessandro Marques
-Economista/Cientista de Dados
+
+Economista
+
+Cientista de Dados
