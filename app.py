@@ -35,7 +35,7 @@ with st.sidebar:
     st.title("MENU")
 
     # Caminho da imagem
-    img_path = "img/RCA.png"
+    img_path = "img/RCA.jpg"
 
     # Verifica se a imagem existe e é válida
     if os.path.exists(img_path):
