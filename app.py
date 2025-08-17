@@ -1,6 +1,8 @@
-import streamlit as st 
+import streamlit as st
 import sys
 import importlib
+import os
+from PIL import Image
 
 from utils import create as PageCreate
 from utils import list as PageList
@@ -8,7 +10,6 @@ from utils import atualizar as PageUpdate
 from utils import deletar as PageDelete
 
 ################### Reinicia automaticamente o Streamlit
-#
 # Lista de módulos que você quer sempre recarregar
 MODULES_TO_RELOAD = [
     "controllers.pontos_controller",
@@ -24,7 +25,7 @@ for module_name in MODULES_TO_RELOAD:
 # Limpa cache do Streamlit para garantir que funções atualizadas rodem
 st.cache_data.clear()
 st.cache_resource.clear()
-#
+
 ###########################################################################################
 
 st.set_page_config(layout="wide", page_title="Pontos Culturas")
@@ -32,10 +33,23 @@ st.set_page_config(layout="wide", page_title="Pontos Culturas")
 # --- Sidebar ---
 with st.sidebar:
     st.title("MENU")
-    st.image("img/RCA.png", use_container_width=True)
+
+    # Caminho da imagem
+    img_path = "img/RCA.png"
+
+    # Verifica se a imagem existe e é válida
+    if os.path.exists(img_path):
+        try:
+            img = Image.open(img_path)
+            img.verify()  # valida se é realmente uma imagem
+            st.image(img_path, use_container_width=True)
+        except Exception as e:
+            st.warning(f"Imagem não pôde ser exibida: {img_path}\nErro: {e}")
+    else:
+        st.warning(f"Imagem não encontrada: {img_path}")
+
     page = st.selectbox("PONTOS", ["Incluir", "Consultar", "Atualizar", "Deletar"])
     st.info("Você profissional do campo, pode contribuir com a coleta de informações de culturas no território brasileiro.")
-    
     st.info("Para contato e/ou solicitação de outros municípios: alessandro.alm74@gmail.com")
 
 ###################################################################
@@ -50,7 +64,7 @@ if page == "Incluir":
 ###################################################################
 elif page == "Consultar":
     PageList.list_pontos()
-    
+
 ###################################################################
 # Atualizar ponto
 ###################################################################
