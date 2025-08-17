@@ -1,4 +1,4 @@
-# pages/update.py
+# pages/atualizar.py
 import streamlit as st
 from services import database as db
 import controllers.pontos_controller as PontosController

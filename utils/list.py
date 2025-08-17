@@ -1,14 +1,14 @@
-# list.py
+# list_pontos.py
 import streamlit as st
 import pandas as pd
 import folium
-import matplotlib.pyplot as plt
+import controllers.pontos_controller as PontosController
+
+from shapely import wkt
+from services.database import supabase, carregar_municipios, carregar_limite_municipio, carregar_estados
 from matplotlib.colors import to_hex
 from streamlit_folium import st_folium
 from folium.plugins import Fullscreen
-from geobr import read_municipality
-import controllers.pontos_controller as PontosController
-
 
 def list_pontos():
     if not st.session_state.get('usuario_autenticado', False):
@@ -25,25 +25,21 @@ def list_pontos():
         else:
             rows = []
             for item in data:
-                if isinstance(item, dict):
-                    rows.append([
-                        item.get('id'), item.get('estado'), item.get('codigo'),
-                        item.get('municipio'), item.get('data'),
-                        item.get('latitude'), item.get('longitude'),
-                        item.get('cultura'), item.get('estadiofenolog'),
-                        item.get('altitude'), item.get('temperatura'),
-                        item.get('tpsafra'), item.get('check_point')
-                    ])
-                else:
-                    rows.append([
-                        getattr(item, 'id', None), getattr(item, 'estado', None),
-                        getattr(item, 'codigo', None), getattr(item, 'municipio', None),
-                        getattr(item, 'data', None), getattr(item, 'latitude', None),
-                        getattr(item, 'longitude', None), getattr(item, 'cultura', None),
-                        getattr(item, 'estadiofenolog', None), getattr(item, 'altitude', None),
-                        getattr(item, 'temperatura', None), getattr(item, 'tpsafra', None),
-                        getattr(item, 'check_point', None)
-                    ])
+                rows.append([
+                    item.get('id'),
+                    item.get('estado'),
+                    item.get('codigo'),
+                    item.get('municipio'),
+                    item.get('data'),
+                    item.get('latitude'),
+                    item.get('longitude'),
+                    item.get('cultura'),
+                    item.get('estadiofenolog'),
+                    item.get('altitude'),
+                    item.get('temperatura'),
+                    item.get('tpsafra'),
+                    item.get('check_point')
+                ])
             st.session_state['df'] = pd.DataFrame(rows, columns=[
                 'id', 'estado', 'codigo', 'municipio', 'data',
                 'latitude', 'longitude', 'cultura', 'estadiofenolog',
@@ -54,14 +50,10 @@ def list_pontos():
     if df.empty:
         st.info("Nenhum ponto cadastrado.")
 
-    # cria as colunas uma única vez; tudo da esquerda ficará DENTRO de col1
     col1, col2 = st.columns([1, 1], gap="large")
 
-    # ---------------------------------------------------------------------
-    # COLUNA ESQUERDA (filtros, grid, ID e formulário de edição)
-    # ---------------------------------------------------------------------
+    # ---------------- COLUNA ESQUERDA ----------------
     with col1:
-        # --- SELEÇÃO DE ESTADO E MUNICÍPIO ---
         estados = sorted(df['estado'].dropna().unique().tolist()) if not df.empty else []
         estado = st.selectbox("Estado", [""] + estados)
 
@@ -87,18 +79,12 @@ def list_pontos():
             st.info("Selecione um estado e um município para visualizar os registros.")
 
         st.divider()
-
-        # --- INICIALIZA VARIÁVEIS DE SESSÃO ---
         st.session_state.setdefault('modo_edicao', False)
         st.session_state.setdefault('selected_id', None)
         st.session_state.setdefault('id_selecao', 0)
         st.session_state.setdefault('sucesso_msg', "")
         st.session_state.setdefault('erro_atualizar', "")
 
-        # --- VARIÁVEL PADRÃO PARA MUNICÍPIO ---
-        novo_municipio = "0"
-
-        # --- ENTRADA DO ID PARA EDIÇÃO ---
         id_sel = st.number_input(
             "ID do registro para editar (digite o id) - Após digitar o ID, clique Enter ou fora da caixa.",
             min_value=0,
@@ -114,7 +100,6 @@ def list_pontos():
             else:
                 st.error("Registro não encontrado no filtro atual.")
 
-        # --- FORMULÁRIO DE EDIÇÃO (permanece na COLUNA 1) ---
         if st.session_state['modo_edicao'] and st.session_state['selected_id'] is not None:
             id_edit = st.session_state['selected_id']
             registro = df_filtrado[df_filtrado['id'] == id_edit] if not df_filtrado.empty else pd.DataFrame()
@@ -122,26 +107,32 @@ def list_pontos():
             if registro.empty:
                 st.error("Registro não encontrado para edição.")
             else:
-                # Lista de municípios do geobr (todos da UF)
-                try:
-                    codigo_muni = int(registro.iloc[0].get('codigo', 0))
-                    codigo_uf = codigo_muni // 100000  # 2 dígitos da UF a partir do código IBGE
-                    municipios_gdf = read_municipality(code_muni=codigo_uf, year=2022)
-                    lista_municipios = ["0"] + sorted(municipios_gdf['name_muni'].unique().tolist())
-                except Exception as e:
-                    st.error(f"Erro ao carregar municípios do geobr: {e}")
-                    lista_municipios = ["0"] + sorted(
-                        df.loc[df['estado'] == estado, 'municipio'].dropna().unique().tolist()
-                    )
+                municipio_atual = registro.iloc[0]['municipio']
+                codigo_atual = registro.iloc[0]['codigo']
+                lat_atual = float(registro.iloc[0]['latitude'])
+                lon_atual = float(registro.iloc[0]['longitude'])
+                check_atual = bool(registro.iloc[0]['check_point']) if 'check_point' in registro.columns else False
+                
+                #########################################################
+                
+                estados_info = carregar_estados()
+                df_estados = pd.DataFrame(estados_info)
+                df_estados.rename(columns={'name_state': 'estado'}, inplace=True)
+                
+                # 1️⃣ Recupera code_state do estado atual do registro
+                estado_nome = registro.iloc[0]['estado']
+                # Supondo que você tenha um dataframe ou dict com mapeamento estado -> code_state
+                # Exemplo: df_estados = pd.DataFrame({'estado': [...], 'code_state': [...]})
+                code_state = df_estados.loc[df_estados['estado'] == estado_nome, 'code_state'].values
+                code_state = str(code_state[0]) if len(code_state) > 0 else None
 
-                municipio_atual = registro.iloc[0].get('municipio', '')
-                codigo_atual = registro.iloc[0].get('codigo', '')
-                lat_atual = float(registro.iloc[0].get('latitude', 0))
-                lon_atual = float(registro.iloc[0].get('longitude', 0))
-                check_atual = bool(registro.iloc[0].get('check_point', False)) if 'check_point' in registro.columns else False
+                lista_municipios_info = carregar_municipios(code_state) if code_state else []
+                lista_municipios = [""] + sorted([m['name_muni'] for m in lista_municipios_info])
 
+
+                ###################################################################################
+                
                 st.markdown(f"### Editando registro ID {id_edit}")
-
                 novo_municipio = st.selectbox(
                     "Selecione o Município",
                     options=lista_municipios,
@@ -149,13 +140,10 @@ def list_pontos():
                     key="edit_municipio"
                 )
 
-                if novo_municipio != "0":
-                    cod_match = df.loc[
-                        (df['estado'] == estado) & (df['municipio'] == novo_municipio), 'codigo'
-                    ]
-                    codigo_municipio = cod_match.iloc[0] if not cod_match.empty else codigo_atual
-                else:
-                    codigo_municipio = codigo_atual
+                cod_match = df.loc[
+                    (df['estado'] == estado) & (df['municipio'] == novo_municipio), 'codigo'
+                ]
+                codigo_municipio = cod_match.iloc[0] if not cod_match.empty else codigo_atual
 
                 st.text_input("Código do Município", value=str(codigo_municipio), disabled=True, key="edit_codigo")
                 nova_lat = st.number_input("Latitude", value=float(lat_atual), format="%.6f", key="edit_lat")
@@ -186,66 +174,64 @@ def list_pontos():
                     args=(id_edit, municipio_atual, codigo_municipio, nova_lat, nova_lon, novo_check, novo_municipio),
                 )
 
-                # Mensagens (também dentro da coluna)
                 if st.session_state['sucesso_msg']:
                     st.success(st.session_state.pop('sucesso_msg'))
                 if st.session_state['erro_atualizar']:
                     st.error(st.session_state.pop('erro_atualizar'))
 
-    # ---------------------------------------------------------------------
-    # COLUNA DIREITA (mapa)
-    # ---------------------------------------------------------------------
+    # ---------------- COLUNA DIREITA ----------------
     with col2:
         st.subheader("🗺️ Mapa dos Pontos")
-        if 'df_filtrado' not in locals():
-            df_filtrado = df.iloc[0:0].copy()
-
-        if not df_filtrado.empty:
-            m = folium.Map(
-                location=[df_filtrado['latitude'].mean(), df_filtrado['longitude'].mean()],
-                zoom_start=10,
-                min_zoom=5,
-                max_zoom=20,
-                tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                attr='Esri'
-            )
-            Fullscreen().add_to(m)
-
-            try:
-                if df_filtrado['codigo'].notnull().any():
-                    codigo_ibge = int(df_filtrado['codigo'].iloc[0])
-                    municipio_gdf = read_municipality(code_muni=codigo_ibge, year=2022)
-                    if not municipio_gdf.empty:
-                        folium.GeoJson(
-                            municipio_gdf.__geo_interface__,
-                            name='Limite Município',
-                            style_function=lambda feature: {
-                                'color': 'blue',
-                                'weight': 3,
-                                'fillColor': 'blue',
-                                'fillOpacity': 0.1,
-                            }
-                        ).add_to(m)
-            except Exception as e:
-                st.error(f"Erro ao carregar o município via geobr: {e}")
-
-            culturas_unicas = df_filtrado['cultura'].unique()
-            cmap = plt.cm.get_cmap('tab20', len(culturas_unicas))
-            cores_culturas = {cultura: to_hex(cmap(i)) for i, cultura in enumerate(culturas_unicas)}
-
-            for _, row in df_filtrado.iterrows():
-                cor_marcador = cores_culturas.get(row['cultura'], '#808080')
-                folium.CircleMarker(
-                    location=[row['latitude'], row['longitude']],
-                    radius=7,
-                    color=cor_marcador,
-                    fill=True,
-                    fill_color=cor_marcador,
-                    fill_opacity=0.7,
-                    popup=f"ID: {row['id']}<br>Cultura: {row['cultura']}<br>Data: {row['data']}"
-                ).add_to(m)
-
-            folium.LatLngPopup().add_to(m)
-            st_folium(m, width=700, height=500)
-        else:
+        if df_filtrado.empty:
             st.warning("Nenhum ponto encontrado para o município selecionado.")
+            return
+
+        # Centraliza mapa
+        m = folium.Map(
+            location=[df_filtrado['latitude'].mean(), df_filtrado['longitude'].mean()],
+            zoom_start=10,
+            min_zoom=5,
+            max_zoom=20,
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri'
+        )
+        Fullscreen().add_to(m)
+
+        # ------------------ Limite do município ------------------
+        code_muni_sel = df_filtrado.iloc[0]['codigo']
+        geom_wkt = carregar_limite_municipio(code_muni_sel)
+        #st.write(f"WKT carregado para code_muni={code_muni_sel}: {geom_wkt}")  # DEBUG
+
+        if geom_wkt:
+            try:
+                geom_obj = wkt.loads(geom_wkt)
+                folium.GeoJson(
+                    geom_obj.__geo_interface__,
+                    name="Limite do Município",
+                    style_function=lambda x: {"fillColor": "#00000000", "color": "#0000FF", "weight": 2}
+                ).add_to(m)
+            except Exception as e:
+                st.error(f"Erro ao desenhar limite do município: {e}")
+        else:
+            st.warning("Nenhum limite encontrado para o município selecionado.")
+
+        # ------------------ Pontos ------------------
+        culturas_unicas = df_filtrado['cultura'].unique()
+        import matplotlib.pyplot as plt
+        cmap = plt.cm.get_cmap('tab20', len(culturas_unicas))
+        cores_culturas = {cultura: to_hex(cmap(i)) for i, cultura in enumerate(culturas_unicas)}
+
+        for _, row in df_filtrado.iterrows():
+            cor_marcador = cores_culturas.get(row['cultura'], '#808080')
+            folium.CircleMarker(
+                location=[row['latitude'], row['longitude']],
+                radius=7,
+                color=cor_marcador,
+                fill=True,
+                fill_color=cor_marcador,
+                fill_opacity=0.7,
+                popup=f"ID: {row['id']}<br>Cultura: {row['cultura']}<br>Data: {row['data']}"
+            ).add_to(m)
+
+        folium.LatLngPopup().add_to(m)
+        st_folium(m, width=700, height=500)

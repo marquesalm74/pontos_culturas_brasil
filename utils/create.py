@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 from services import database as db
-import controllers.pontos_controller as PontosController
+from controllers.pontos_controller import PontosController
 
 CULTURAS = [
     '', 'Açaí','Algodão', 'Amendoim', 'Arroz','Babaçu','Borracha','Buriti','Cacau',
@@ -111,40 +111,65 @@ def create():
     with col2:
         if not st.session_state.get("usuario_autenticado", False):
             st.info("Faça login para acessar o formulário de inclusão.")
-            return
+            st.stop()
 
-        # Carrega lista de estados da view
-        try:
-            estados = db.carregar_estados()
-        except Exception as e:
-            st.error(f"Erro ao carregar estados: {e}")
-            estados = []
+        # Carregar estados
+        estados = db.carregar_estados()  # [{'code_state':..., 'name_state':..., 'abbrev_state':...}]
+        estados_dict = {e["name_state"]: e["code_state"] for e in estados}
 
-        uf = st.selectbox("Estado (UF)", [""] + estados, key="estado_selecionado")
+        # Inicializa session_state
+        if "estado_selecionado" not in st.session_state:
+            st.session_state["estado_selecionado"] = ""
+        if "municipios_lista" not in st.session_state:
+            st.session_state["municipios_lista"] = []
+        if "municipios_obj" not in st.session_state:
+            st.session_state["municipios_obj"] = []
+        if "municipio_selecionado" not in st.session_state:
+            st.session_state["municipio_selecionado"] = ""
+        if "code_muni" not in st.session_state:
+            st.session_state["code_muni"] = ""
 
-        # Carrega municípios dinamicamente quando o estado muda
-        if uf:
-            if "municipios_cache" not in st.session_state or st.session_state.get("estado_cache") != uf:
-                try:
-                    municipios_df = pd.DataFrame(db.carregar_municipios(uf))
-                    st.session_state["municipios_cache"] = municipios_df
-                    st.session_state["estado_cache"] = uf
-                except Exception as e:
-                    st.error(f"Erro ao carregar municípios: {e}")
-                    st.session_state["municipios_cache"] = pd.DataFrame()
-        else:
-            st.session_state["municipios_cache"] = pd.DataFrame()
+        # Função para atualizar municípios ao selecionar um estado
+        def atualizar_municipios():
+            nome_estado = st.session_state["estado_selecionado"]
+            code_state = estados_dict.get(nome_estado)
 
-        municipios_lista = sorted(st.session_state["municipios_cache"]['name_muni'].tolist()) if not st.session_state["municipios_cache"].empty else []
-        municipio = st.selectbox("Município", [""] + municipios_lista, key="municipio_selecionado")
+            if code_state:
+                municipios = db.carregar_municipios(str(code_state).strip())  # remover espaços extras
+                st.session_state["municipios_lista"] = [m["name_muni"] for m in municipios]
+                st.session_state["municipios_obj"] = municipios
+            else:
+                print("Nenhum code_state encontrado para este estado")
+                st.session_state["municipios_lista"] = []
+                st.session_state["municipios_obj"] = []
 
-        code_muni = ""
-        if municipio and not st.session_state["municipios_cache"].empty:
-            df = st.session_state["municipios_cache"]
-            row = df[df['name_muni'].str.strip().str.lower() == municipio.strip().lower()]
-            if not row.empty:
-                code_muni = str(row.iloc[0]['code_muni'])
-                st.session_state["code_muni"] = code_muni
+            st.session_state["municipio_selecionado"] = ""
+            st.session_state["code_muni"] = ""
+
+        # Selectbox de estado
+        estado = st.selectbox(
+            "Selecione o Estado",
+            [""] + list(estados_dict.keys()),
+            key="estado_selecionado",
+            on_change=atualizar_municipios
+        )
+
+        # Selectbox de município
+        municipio = st.selectbox(
+            "Município",
+            [""] + st.session_state.get("municipios_lista", []),
+            key="municipio_selecionado"
+        )
+
+        # Atualiza code_muni com base no município selecionado
+        municipios_obj = st.session_state.get("municipios_obj", [])
+        nome_muni = st.session_state.get("municipio_selecionado", "")
+        code_muni = next((m["code_muni"] for m in municipios_obj if m["name_muni"] == nome_muni), "")
+        st.session_state["code_muni"] = code_muni
+
+        #####################################################################
+        # Preenchimento do Formulário
+        #####################################################################
 
         with st.form("form_ponto"):
             st.text_input("Código do Município", value=st.session_state.get("code_muni", ""), disabled=True, key="code_muni_display")
@@ -166,7 +191,11 @@ def create():
             submit = st.form_submit_button("Enviar")
 
             if submit:
-                if not (uf and municipio and st.session_state.get("code_muni")):
+                estado_nome = st.session_state.get("estado_selecionado", "")
+                municipio = st.session_state.get("municipio_selecionado", "")
+                code_muni = st.session_state.get("code_muni", "")
+
+                if not (estado_nome and municipio and code_muni):
                     st.error("UF, Município e Código do município são obrigatórios.")
                 elif not (-90 <= lat <= 90 and -180 <= lon <= 180):
                     st.error("Latitude ou longitude fora do intervalo válido.")
@@ -174,8 +203,8 @@ def create():
                     st.error("Cultura é obrigatória.")
                 else:
                     payload = {
-                        "estado": uf,
-                        "codigo": st.session_state.get("code_muni"),
+                        "estado": estado_nome,
+                        "codigo": code_muni,
                         "municipio": municipio,
                         "data": data_reg.isoformat(),
                         "latitude": float(lat),
@@ -188,7 +217,7 @@ def create():
                         "informante": informante,
                         "emailinfo": emailinfo,
                         "obs": obs or "",
-                        "check_point": check_point  # <-- agora pega do checkbox
+                        "check_point": check_point
                     }
                     try:
                         PontosController.Incluir(payload)
