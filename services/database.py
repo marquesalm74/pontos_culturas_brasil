@@ -85,30 +85,78 @@ def deletar_usuario(email: str):
 # MUNICÍPIOS
 # --------------------------
 def carregar_estados():
-    try:
-        resp = supabase.table("estados_unicos").select("*").execute()
-        data = resp.data or []
-        estados = sorted({(d.get("name_state") or "").strip() for d in data if d.get("name_state")})
-        return estados
-    except Exception as e:
-        raise RuntimeError(f"Erro ao carregar estados da view: {e}")
-
-
-
-def carregar_municipios(estado: str = None):
     """
-    Retorna municípios.
-    - Se 'estado' for None → retorna todos.
-    - Se 'estado' for string → retorna só do estado.
+    Retorna lista de estados no formato:
+    [{'code_state': '11', 'name_state': 'Rondônia', 'abbrev_state': 'RO'}, ...]
     """
     try:
-        query = supabase.table("tbl_municipiosbr") \
-                        .select("name_state, code_muni, name_muni, name_intermmediate, name_immediate")
-
-        if estado:
-            query = query.eq("name_state", estado.strip())
-
-        resp = query.execute()
-        return resp.data or []
+        resp = supabase.table("tbl_estados").select(
+            "code_state, name_state, abbrev_state"
+        ).order("name_state").limit(None).execute()
+        
+        if resp.data:
+            # Usar tuplas para garantir unicidade
+            estados_unicos = {
+                (str(e["code_state"]), e["name_state"], e["abbrev_state"])
+                for e in resp.data
+            }
+            
+            # Retornar lista ordenada pelo nome do estado
+            return [
+                {"code_state": e[0], "name_state": e[1], "abbrev_state": e[2]}
+                for e in sorted(estados_unicos, key=lambda x: x[1])
+            ]
+        return []
     except Exception as e:
-        raise RuntimeError(f"Erro ao carregar municípios: {e}")
+        print("Erro carregar_estados:", e)
+        return []
+
+############### Carrega os Municipios
+# def carregar_municipios(code_state):
+#     """
+#     Retorna lista de municípios de um estado (filtra pelo code_state numérico)
+#     """
+#     try:
+#         resp = supabase.table("tbl_municipiosbr").select(
+#             ["code_state", "name_state", "abbrev_state", "code_muni", "name_muni"]
+#         ).eq("code_state", code_state).order("name_muni").limit(None).execute()
+        
+#         if resp.data:
+#             return resp.data
+#         return []
+#     except Exception as e:
+#         print("Erro carregar_municipios:", e)
+#         return []
+
+def carregar_municipios(code_state):
+    """
+    Retorna lista de municípios de um estado (filtra pelo code_state como string)
+    """
+    try:
+        code_state = str(code_state)  # garante que seja string simples
+        resp = supabase.table("tbl_municipiosbr").select(
+            "code_state, code_muni, name_muni"
+        ).eq("code_state", code_state).order("name_muni").limit(None).execute()
+
+        if resp.data:
+            # Certifica que code_state e code_muni em cada registro são strings
+            for m in resp.data:
+                if isinstance(m.get("code_state"), list):
+                    m["code_state"] = str(m["code_state"][0])
+                if isinstance(m.get("code_muni"), list):
+                    m["code_muni"] = str(m["code_muni"][0])
+            return resp.data
+        return []
+    except Exception as e:
+        print("Erro carregar_municipios:", e)
+        return []
+    
+############### Limite dos Municipios    
+def carregar_limite_municipio(code_muni):
+    """Retorna WKT do município pelo código."""
+    try:
+        resp = supabase.table("tbl_municipiosbr").select("geom_wkt").eq("code_muni", code_muni).execute()
+        return resp.data[0]["geom_wkt"] if resp.data else None
+    except Exception as e:
+        print("Erro carregar_limite_municipio:", e)
+        return None
