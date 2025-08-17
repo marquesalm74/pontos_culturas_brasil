@@ -32,7 +32,7 @@ st.set_page_config(layout="wide", page_title="Pontos Culturas")
 # --- Sidebar ---
 with st.sidebar:
     st.title("MENU")
-    st.image("img/ponto_brasil.png" if st.query_params.get("dev") else "img/RCA.png", use_container_width=True)
+    st.image("img/RCA.png", use_container_width=True)
     page = st.selectbox("PONTOS", ["Incluir", "Consultar", "Atualizar", "Deletar"])
     st.info("Você profissional do campo, pode contribuir com a coleta de informações de culturas no território brasileiro.")
     
