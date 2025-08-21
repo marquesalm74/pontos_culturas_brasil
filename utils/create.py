@@ -6,18 +6,19 @@ from services import database as db
 from controllers.pontos_controller import PontosController
 
 CULTURAS = [
-    '', 'Açaí','Algodão', 'Amendoim', 'Arroz','Babaçu','Borracha','Buriti','Cacau',
-    'Café Novo', 'Café em Produção', 'Café em Recuperação','Castanha-do-Brasil',
-    'Farinha de Mandioca','Feijão 1ª Safra','Feijão 2ª Safra', 'Feijão 3ª Safra',
-    'Girassol', 'Laranja','Limão','Macadâmia', 'Mamona','Mexirica','Milho Verão',
-    'Milho Safrinha', 'Milho Silagem','Morango','Pequi','Pinhão','Soja','Sorgo',
-    'Sorgo Forrageiro','Trigo Sequeiro', 'Trigo Irrigado','Umbu'
+    '', 'Abacate', 'Abacaxi','Açaí','Algodão', 'Alho','Amendoim', 'Arroz', 'Aveia','Azeitona', 'Babaçu',
+    'Banana', 'Batata-Doce', 'Batata-Inglesa','Borracha','Buriti','Cacau','Café Novo', 'Café em Produção', 'Café em Recuperação',
+    'Cana-de-Açúcar','Castanha-do-Brasil', 'Castanha-de-Caju','Cebola', 'Centeio', 'Cevada', 'Coco-da-Baía', 'Erva-Mate',
+    'Farinha de Mandioca','Feijão 1ª Safra','Feijão 2ª Safra', 'Feijão 3ª Safra', 'Girassol', 'Goiaba', 'Guaraná','Laranja','Limão',
+    'Macadâmia', 'Maçã', 'Mamão', 'Mandioca','Manga', 'Maracujá','Mamona', 'Melancia', 'Melão','Mexirica','Milho Verão',
+    'Milho Safrinha', 'Milho Silagem','Morango','Pequi', 'Pêssego','Pinhão', 'Pimenta do Reino','Soja','Sorgo',
+    'Sorgo Forrageiro','Tangerina', 'Tomate','Trigo Sequeiro', 'Trigo Irrigado', 'Triticale', 'Umbu', 'Urucum','Uva'
 ]
 
 ESTADIOS = ['', 'Germinação/Emergência', 'Desenvolvimento Vegetativo', 'Floração',
            'Enchimento de Grão', 'Maturação', 'Colheita']
 
-TPSAFRA_OPTS = ["", 'Lavoura Permanente', 'Pastagem', 'Safra Verão', 'Safrinha']
+TPSAFRA_OPTS = ["", 'Lavoura Permanente', 'Lavoura Temporária','Pastagem', 'Safra Verão', 'Safrinha']
 
 
 def form_login_cadastro():
@@ -221,6 +222,6 @@ def create():
                     }
                     try:
                         PontosController.Incluir(payload)
-                        st.success("Ponto incluído com sucesso.")
+                        st.success("Ponto de {nome_muni} incluído com sucesso.")
                     except Exception as e:
                         st.error(f"Erro ao inserir ponto: {e}")
