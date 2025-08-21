@@ -222,6 +222,7 @@ def create():
                     }
                     try:
                         PontosController.Incluir(payload)
-                        st.success("Ponto de {nome_muni} incluído com sucesso.")
+                        st.success(f"Ponto do município {nome_muni} com cultura {cultura} incluído com sucesso.")
+
                     except Exception as e:
                         st.error(f"Erro ao inserir ponto: {e}")
