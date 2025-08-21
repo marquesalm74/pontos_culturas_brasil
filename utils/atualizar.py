@@ -3,82 +3,83 @@ import streamlit as st
 from services import database as db
 import controllers.pontos_controller as PontosController
 from utils.create import ESTADIOS, TPSAFRA_OPTS, CULTURAS
+from datetime import datetime, date
 
 def atualizar():
     st.title("Atualizar Ponto")
 
-    if not st.session_state.get('usuario_autenticado', False):
-        st.warning("Faça login para atualizar pontos.")
+    if not st.session_state.get("usuario_autenticado", False):
+        st.warning("Faça login para atualizar pontos")
         return
 
-    selected_id = st.session_state.get('selected_id', None)
-    if not selected_id:
-        selected_id = st.number_input("Digite o ID do registro para atualizar", min_value=1, value=1, step=1)
-
-    # Busca registro no banco
+    # Seleciona ID do ponto para atualizar
     pontos = PontosController.SelecionarTodos()
-    registro = next((p for p in pontos if isinstance(p, dict) and p.get("id") == int(selected_id)), None)
-
-    if registro is None:
-        st.error("Registro não encontrado.")
+    if not pontos:
+        st.info("Nenhum ponto cadastrado.")
         return
 
-    with st.form("form_update"):
-        estado = st.text_input("Estado", registro.get("estado", ""))
-        municipio = st.text_input("Município", registro.get("municipio", ""))
-        codigo = st.text_input("Código município", str(registro.get("codigo", "")), disabled=True)
-        data = st.date_input(
-            "Data",
-            value=registro.get("data") if isinstance(registro.get("data"), str) else registro.get("data")
-        )
-        latitude = st.number_input("Latitude", value=float(registro.get("latitude") or 0.0), format="%.6f")
-        longitude = st.number_input("Longitude", value=float(registro.get("longitude") or 0.0), format="%.6f")
+    ponto_ids = [p['id'] for p in pontos]
+    id_selecionado = st.selectbox("Selecione o ID do ponto", ponto_ids, key="id_ponto_edit")
 
-        # Campo com lista de opções para Cultura
-        cultura = st.selectbox(
-            "Cultura",
-            CULTURAS,
-            index=CULTURAS.index(registro.get("cultura", CULTURAS[0])) if registro.get("cultura") in CULTURAS else 0
-        )
+    # Obtém os dados do ponto selecionado
+    ponto = next((p for p in pontos if p['id'] == id_selecionado), None)
+    if not ponto:
+        st.error("Ponto não encontrado.")
+        return
 
-        # Campo com lista de opções para Estádio Fenológico
-        estadio = st.selectbox(
-            "Estádio fenológico",
-            ESTADIOS,
-            index=ESTADIOS.index(registro.get("estadiofenolog", ESTADIOS[0])) if registro.get("estadiofenolog") in ESTADIOS else 0
-        )
+    # Inicializa session_state para cada campo se ainda não existir
+    campos = {
+        "estado_edit": ponto.get("estado", ""),
+        "municipio_edit": ponto.get("municipio", ""),
+        "cultura_edit": ponto.get("cultura", ""),
+        "tpsafra_edit": ponto.get("tipo_safra", ""),
+        "estadio_edit": ponto.get("estadio", ""),
+        "data_plantio_edit": ponto.get("data_plantio", ""),
+        "observacao_edit": ponto.get("observacao", "")
+    }
 
-        # Campo com lista de opções para Tipo de Safra
-        tpsafra = st.selectbox(
-            "Tipo de Safra",
-            TPSAFRA_OPTS,
-            index=TPSAFRA_OPTS.index(registro.get("tpsafra", TPSAFRA_OPTS[0])) if registro.get("tpsafra") in TPSAFRA_OPTS else 0
-        )
+    for chave, valor in campos.items():
+        if chave not in st.session_state:
+            st.session_state[chave] = valor
 
-        altitude = st.number_input("Altitude", value=int(registro.get("altitude") or 0), step=1)
-        temperatura = st.number_input("Temperatura", value=float(registro.get("temperatura") or 0.0))
-        obs = st.text_area("Observações", registro.get("obs", ""))
+    # Campos do formulário
+    estado = st.selectbox("Estado", sorted(list(db.listar_estados())), key="estado_edit")
+    
+    # Municípios filtrados pelo estado selecionado
+    municipios = db.listar_municipios(estado)
+    municipio = st.selectbox("Município", municipios, key="municipio_edit")
 
-        submit = st.form_submit_button("Atualizar")
+    cultura = st.selectbox("Cultura", CULTURAS, key="cultura_edit")
+    tpsafra = st.selectbox("Tipo de Safra", TPSAFRA_OPTS, key="tpsafra_edit")
+    estadio = st.selectbox("Estádio de desenvolvimento", ESTADIOS, key="estadio_edit")
 
-        if submit:
-            payload = {
-                "estado": estado,
-                "municipio": municipio,
-                "data": data.isoformat() if hasattr(data, "isoformat") else data,
-                "latitude": float(latitude),
-                "longitude": float(longitude),
-                "cultura": cultura,
-                "estadiofenolog": estadio,
-                "tpsafra": tpsafra,
-                "altitude": int(altitude),
-                "temperatura": float(temperatura),
-                "obs": obs
-            }
-            try:
-                PontosController.Atualizar(int(selected_id), payload)
-                st.success("Registro atualizado com sucesso.")
-                st.session_state.pop("df", None)  # limpa cache
-            except Exception as e:
-                st.error(f"Erro ao atualizar: {e}")
+    # Data de plantio
+    if st.session_state["data_plantio_edit"]:
+        try:
+            data_plantio_default = datetime.strptime(st.session_state["data_plantio_edit"], "%Y-%m-%d").date()
+        except:
+            data_plantio_default = date.today()
+    else:
+        data_plantio_default = date.today()
 
+    data_plantio = st.date_input("Data de Plantio", value=data_plantio_default, key="data_plantio_edit")
+
+    observacao = st.text_area("Observação", value=st.session_state["observacao_edit"], key="observacao_edit")
+
+    # Botão para atualizar
+    if st.button("Atualizar Ponto"):
+        novos_dados = {
+            "estado": estado,
+            "municipio": municipio,
+            "cultura": cultura,
+            "tipo_safra": tpsafra,
+            "estadio": estadio,
+            "data_plantio": data_plantio.strftime("%Y-%m-%d"),
+            "observacao": observacao
+        }
+
+        sucesso = PontosController.Atualizar(id_selecionado, novos_dados)
+        if sucesso:
+            st.success("Ponto atualizado com sucesso!")
+        else:
+            st.error("Erro ao atualizar o ponto.")
