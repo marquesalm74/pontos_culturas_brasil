@@ -8,11 +8,11 @@ from controllers.pontos_controller import PontosController
 CULTURAS = [
     '', 'Abacate', 'Abacaxi','Açaí','Algodão', 'Alho','Amendoim', 'Arroz', 'Aveia','Azeitona', 'Babaçu',
     'Banana', 'Batata-Doce', 'Batata-Inglesa','Borracha','Buriti','Cacau','Café Novo', 'Café em Produção', 'Café em Recuperação',
-    'Cana-de-Açúcar','Castanha-do-Brasil', 'Castanha-de-Caju','Cebola', 'Centeio', 'Cevada', 'Coco-da-Baía', 'Erva-Mate',
+    'Cana-de-Açúcar','Castanha-do-Brasil', 'Castanha-de-Caju','Cebola', 'Centeio', 'Cevada', 'Coco-da-Baía', 'Erva-Mate', 'Eucalipto',
     'Farinha de Mandioca','Feijão 1ª Safra','Feijão 2ª Safra', 'Feijão 3ª Safra', 'Girassol', 'Goiaba', 'Guaraná','Laranja','Limão',
     'Macadâmia', 'Maçã', 'Mamão', 'Mandioca','Manga', 'Maracujá','Mamona', 'Melancia', 'Melão','Mexirica','Milho Verão',
-    'Milho Safrinha', 'Milho Silagem','Morango','Pequi', 'Pêssego','Pinhão', 'Pimenta do Reino','Soja','Sorgo',
-    'Sorgo Forrageiro','Tangerina', 'Tomate','Trigo Sequeiro', 'Trigo Irrigado', 'Triticale', 'Umbu', 'Urucum','Uva'
+    'Milho Safrinha', 'Milho Silagem','Morango', 'Pastagem Natural', 'Pastagem Nativa', 'Pastagem Artificial','Pequi', 'Pêssego','Pinhão',
+    'Pimenta do Reino','Soja','Sorgo','Sorgo Forrageiro','Tangerina', 'Tomate','Trigo Sequeiro', 'Trigo Irrigado', 'Triticale', 'Umbu', 'Urucum','Uva'
 ]
 
 ESTADIOS = ['', 'Germinação/Emergência', 'Desenvolvimento Vegetativo', 'Floração',
@@ -187,7 +187,7 @@ def create():
             obs = st.text_area("Observações (opcional)", placeholder='Área Agrícola: ha, alqueire mineiro, alqueire paulista etc.')
             
             # NOVO: opção para já marcar como verificado
-            check_point = st.checkbox("Se o ponto está verificado, favor marcar como verificado", value=False)
+            check_point = st.checkbox("Se o ponto está verificado, favor marcar como verificado", value=False, disabled=True)
             
             submit = st.form_submit_button("Enviar")
 
